@@ -1,10 +1,17 @@
 
-**Abbaspoor Hussin Hoffman eLife 2023
+Abbaspoor Hussin Hoffman eLife 2023
+
 Theta-and gamma-band oscillatory uncoupling in the macaque hippocampus
-**
+
 
 **See Custom scripts folder for code to generate figures from data provided here:**
 https://zenodo.org/record/7757458
+
+Portions of the stationary data and recording methods were first described and analyzed for other purposes in:
+
+Leonard and Hoffman Current Biology (2017)https://doi.org/10.1016/j.cub.2016.11.027
+
+Leonard et al., 2015 J Neurosci  https://doi.org/10.1523/JNEUROSCI.0864-15.2015  
 
 
 **For the general toolboxes used, see links below:**
