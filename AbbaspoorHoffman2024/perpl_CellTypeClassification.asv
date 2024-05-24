@@ -1,0 +1,121 @@
+%% Cell Type Classification using Waveform and ISI
+%%% This code requires run_umap script
+%%% https://www.mathworks.com/matlabcentral/fileexchange/71902
+%%% Saman Abbaspoor 03/12/2024 - Hoffman Lab - Vanderbilt
+
+%% Load cell table
+clear all, clc
+load('CellTable_Complete_8.mat')
+
+%% Collect Attributes for cell classification
+isSomatic = CellTable.isSomatic;
+offside = CellTable.offside;
+MultiplePeaks = CellTable.MultiplePeaks;
+
+
+Depth = CellTable.depth(isSomatic & ~offside & ~MultiplePeaks);
+BurstIndex = CellTable.BurstIndex(isSomatic & ~offside & ~MultiplePeaks);
+FR = CellTable.firingRate(isSomatic & ~offside & ~MultiplePeaks);
+acg = CellTable.acg_wide(isSomatic & ~offside & ~MultiplePeaks);
+acg = cell2mat(acg'); acg = acg(501-50:501+50, :);
+[~, acg_mean] = max(acg(51:end, :));
+
+log10isi = CellTable.log10isi(isSomatic & ~offside & ~MultiplePeaks);
+log10isi = cell2mat(log10isi');
+intervals = -3:0.04:1;
+intervals2 = intervals(1:end-1)+.02;
+log10_bins = 10.^intervals2';
+log10isi = log10isi.*(10.^intervals2)';
+
+Waveforms = CellTable.filtWaveform(isSomatic & ~offside & ~MultiplePeaks);
+Waveforms = cell2mat(Waveforms);
+Waveforms = (Waveforms - min(Waveforms, [], 2)) ./ (max(Waveforms, [], 2) - min(Waveforms, [], 2));
+
+
+%% Run UMAP
+% [reduction, umap, clusterIdentifiers, extras]=run_umap()
+[WaveformReduced, umap, clusterIdentifiers]=run_umap(Waveforms,...
+    'min_dist', 0.1, 'n_neighbors', 20, 'n_components', 2, ...
+    'n_epochs', 5000, ...
+    'metric', 'euclidean');
+
+[ISIReduced, umap, clusterIdentifiers]=run_umap(log10isi',...
+    'min_dist', 0.1, 'n_neighbors', 20, 'n_components', 2, ...
+    'n_epochs', 5000, ...
+    'metric', 'euclidean');
+
+% figure
+% putativeCellType = CellTable.putativeCellType(isSomatic & ~offside & ~MultiplePeaks);
+% gscatter(ISIReduced(:, 1), ISIReduced(:, 2), putativeCellType, [], [], 20)
+
+
+%%
+NumClusters = 15; % This value should be estimated based on the GMM (next section)
+
+Attributes = [ISIReduced, WaveformReduced];
+CellTypeID = spectralcluster(Attributes, NumClusters, 'Distance', 'mahalanobis'); %'mahalanobis'
+
+CellTable.putativeCellType(isSomatic & ~offside & ~MultiplePeaks) = CellTypeID;
+
+%% Gaussian Mixutre Model (Tuning the model)
+
+k = 1:20;
+nK = numel(k);
+Sigma = {'diagonal','full'};
+nSigma = numel(Sigma);
+SharedCovariance = {true,false};
+SCtext = {'true','false'};
+nSC = numel(SharedCovariance);
+RegularizationValue = 0.01;
+options = statset('MaxIter',10000);
+
+gm = cell(nK,nSigma,nSC);
+aic = zeros(nK,nSigma,nSC);
+bic = zeros(nK,nSigma,nSC);
+converged = false(nK,nSigma,nSC);
+
+% Fit all models
+for m = 1:nSC
+    for j = 1:nSigma
+        for i = 1:nK
+            gm{i,j,m} = fitgmdist(Attributes,k(i),...
+                'CovarianceType',Sigma{j},...
+                'SharedCovariance',SharedCovariance{m},...
+                'RegularizationValue',RegularizationValue,...
+                'Options',options);
+            aic(i,j,m) = gm{i,j,m}.AIC;
+            bic(i,j,m) = gm{i,j,m}.BIC;
+            converged(i,j,m) = gm{i,j,m}.Converged;
+        end
+    end
+end
+
+allConverge = (sum(converged(:)) == nK*nSigma*nSC);
+
+
+figure
+bar(reshape(aic,nK,nSigma*nSC))
+title('AIC For Various $k$ and $\Sigma$ Choices','Interpreter','latex')
+xlabel('$k$','Interpreter','Latex')
+ylabel('AIC')
+legend({'Diagonal-shared','Full-shared','Diagonal-unshared',...
+    'Full-unshared'})
+
+
+figure
+bar(reshape(bic,nK,nSigma*nSC))
+title('BIC For Various $k$ and $\Sigma$ Choices','Interpreter','latex')
+xlabel('$c$','Interpreter','Latex')
+ylabel('BIC')
+legend({'Diagonal-shared','Full-shared','Diagonal-unshared',...
+    'Full-unshared'})
+
+
+%% Spectral gap - Estimate the number of clusters
+
+[~,V_temp,D_temp] = spectralcluster(Attributes, 1, 'Distance', 'mahalanobis'); %'mahalanobis'
+
+
+
+
+
