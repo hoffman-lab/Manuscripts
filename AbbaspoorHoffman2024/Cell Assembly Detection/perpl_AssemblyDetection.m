@@ -2,7 +2,7 @@
 %%% Ref: V Lopes-dos-Santos 2013; Detecting cell assemblies in large neuronal populations
 %%% To run the code you need Cell Assembly Detection toolbox from:
 %%% https://github.com/tortlab/Cell-Assembly-Detection
-%%% This code runs PCA on the normalized spike matrix, and comoutes the
+%%% This code runs PCA on the normalized spike matrix, and computes the
 %%% number of significant components/cell assemblies using shuffling or
 %%% analytical methods. Next, it runs ICA on the PCA-reduced space to demix
 %%% the signal and extract cell assemblies.
